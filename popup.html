@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>DevWait AI</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+
+    <h2>🤖 DevWait AI</h2>
+
+    <div id="selectedText">
+        No text selected.
+    </div>
+
+    <textarea
+        id="prompt"
+        placeholder="Ask DevWait AI..."
+    ></textarea>
+
+    <button id="askBtn">
+        Ask AI
+    </button>
+<div class="actions">
+    <button id="explainBtn">🔍 Explain</button>
+    <button id="fixBtn">🛠️ Fix</button>
+    <button id="debugBtn">🐛 Debug</button>
+</div>
+
+<div class="response-actions">
+    <button id="copyBtn">
+        📋 Copy Response
+    </button>
+
+    <button id="copyCodeBtn">
+        💻 Copy Code
+    </button>
+</div>
+    
+    <div id="status"></div>
+
+    <div id="response"></div>
+
+    <script src="popup.js"></script>
+
+</body>
+
+</html>
