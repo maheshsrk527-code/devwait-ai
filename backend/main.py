@@ -1,8 +1,10 @@
 import os
+import time
+import random
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
@@ -14,11 +16,11 @@ from google import genai
 
 BASE_DIR = Path(__file__).resolve().parent
 
-# Load backend/.env
 load_dotenv(BASE_DIR / ".env")
 
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
 GEMINI_MODEL = os.getenv(
     "GEMINI_MODEL",
     "gemini-3.6-flash"
@@ -27,18 +29,25 @@ GEMINI_MODEL = os.getenv(
 DEVWAIT_API_KEY = os.getenv("DEVWAIT_API_KEY")
 
 
+# Optional fallback model
+GEMINI_FALLBACK_MODEL = os.getenv(
+    "GEMINI_FALLBACK_MODEL",
+    ""
+).strip()
+
+
 # ============================================================
 # ENVIRONMENT VALIDATION
 # ============================================================
 
 if not GEMINI_API_KEY:
     raise RuntimeError(
-        "GEMINI_API_KEY is not configured in backend/.env"
+        "GEMINI_API_KEY is not configured."
     )
 
 if not DEVWAIT_API_KEY:
     raise RuntimeError(
-        "DEVWAIT_API_KEY is not configured in backend/.env"
+        "DEVWAIT_API_KEY is not configured."
     )
 
 
@@ -53,30 +62,12 @@ client = genai.Client(
 
 
 # ============================================================
-# DEBUG INFORMATION
-# ============================================================
-
-print("========================================")
-print("DevWait AI Backend")
-print("========================================")
-print("Gemini API key loaded:", bool(GEMINI_API_KEY))
-print(
-    "Gemini API key length:",
-    len(GEMINI_API_KEY)
-)
-print("Gemini model:", GEMINI_MODEL)
-print("DevWait API key loaded:", bool(DEVWAIT_API_KEY))
-print("Using Vertex AI: False")
-print("========================================")
-
-
-# ============================================================
-# FASTAPI APPLICATION
+# FASTAPI
 # ============================================================
 
 app = FastAPI(
     title="DevWait AI",
-    version="0.4.0",
+    version="0.5.0",
     description="AI-powered developer assistant."
 )
 
@@ -89,8 +80,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_headers=["Content-Type", "X-DevWait-Key"],
 )
 
 
@@ -112,7 +103,7 @@ def root():
     return {
         "status": "online",
         "service": "DevWait AI",
-        "version": "0.4.0"
+        "version": "0.5.0"
     }
 
 
@@ -132,14 +123,93 @@ def health():
 
 
 # ============================================================
+# GEMINI REQUEST WITH RETRY
+# ============================================================
+
+def generate_with_retry(model: str, prompt: str):
+
+    max_attempts = 3
+
+    for attempt in range(max_attempts):
+
+        try:
+
+            return client.models.generate_content(
+                model=model,
+                contents=prompt
+            )
+
+        except Exception as error:
+
+            error_text = str(error)
+
+            print(
+                f"Gemini attempt {attempt + 1}/{max_attempts} "
+                f"failed: {error_text}"
+            )
+
+            # Retry transient server/rate-limit errors
+            transient_errors = (
+                "503",
+                "UNAVAILABLE",
+                "429",
+                "RESOURCE_EXHAUSTED",
+                "500",
+                "INTERNAL"
+            )
+
+            if not any(
+                item in error_text.upper()
+                for item in transient_errors
+            ):
+                raise
+
+            if attempt == max_attempts - 1:
+                raise
+
+            delay = (2 ** attempt) + random.uniform(0, 1)
+
+            print(
+                f"Retrying Gemini in {delay:.2f} seconds..."
+            )
+
+            time.sleep(delay)
+
+
+# ============================================================
 # AI ENDPOINT
 # ============================================================
 
 @app.post("/ai")
-def generate_ai(request: AIRequest):
+def generate_ai(
+    request: AIRequest,
+    x_devwait_key: str | None = Header(
+        default=None,
+        alias="X-DevWait-Key"
+    )
+):
 
     # --------------------------------------------------------
-    # Validate prompt
+    # AUTHENTICATION
+    # --------------------------------------------------------
+
+    if not x_devwait_key:
+
+        raise HTTPException(
+            status_code=401,
+            detail="Missing DevWait API key."
+        )
+
+    if x_devwait_key != DEVWAIT_API_KEY:
+
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid DevWait API key."
+        )
+
+
+    # --------------------------------------------------------
+    # VALIDATE PROMPT
     # --------------------------------------------------------
 
     prompt = request.prompt.strip()
@@ -153,81 +223,80 @@ def generate_ai(request: AIRequest):
 
 
     # --------------------------------------------------------
-    # Validate Gemini configuration
-    # --------------------------------------------------------
-
-    if not GEMINI_API_KEY:
-
-        raise HTTPException(
-            status_code=500,
-            detail="Missing Gemini API key."
-        )
-
-
-    # --------------------------------------------------------
-    # Validate DevWait configuration
-    # --------------------------------------------------------
-
-    if not DEVWAIT_API_KEY:
-
-        raise HTTPException(
-            status_code=500,
-            detail="Missing DevWait API key."
-        )
-
-
-    # --------------------------------------------------------
-    # Call Gemini
+    # PRIMARY MODEL
     # --------------------------------------------------------
 
     try:
 
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt
+        response = generate_with_retry(
+            GEMINI_MODEL,
+            prompt
         )
-
-
-        # ----------------------------------------------------
-        # Get Gemini response
-        # ----------------------------------------------------
 
         ai_text = response.text or ""
 
+        if ai_text:
 
-        if not ai_text:
+            return {
+                "success": True,
+                "model": GEMINI_MODEL,
+                "response": ai_text
+            }
 
-            raise HTTPException(
-                status_code=500,
-                detail="Gemini returned an empty response."
+
+    except Exception as primary_error:
+
+        print(
+            "Primary Gemini model failed:",
+            str(primary_error)
+        )
+
+
+        # ----------------------------------------------------
+        # FALLBACK MODEL
+        # ----------------------------------------------------
+
+        if GEMINI_FALLBACK_MODEL:
+
+            print(
+                "Trying fallback model:",
+                GEMINI_FALLBACK_MODEL
             )
 
+            try:
 
-        # ----------------------------------------------------
-        # Return response
-        # ----------------------------------------------------
+                response = generate_with_retry(
+                    GEMINI_FALLBACK_MODEL,
+                    prompt
+                )
 
-        return {
-            "success": True,
-            "model": GEMINI_MODEL,
-            "response": ai_text
-        }
+                ai_text = response.text or ""
 
+                if ai_text:
 
-    # --------------------------------------------------------
-    # Gemini/API errors
-    # --------------------------------------------------------
+                    return {
+                        "success": True,
+                        "model": GEMINI_FALLBACK_MODEL,
+                        "response": ai_text
+                    }
 
-    except HTTPException:
+            except Exception as fallback_error:
 
-        raise
+                print(
+                    "Fallback Gemini model failed:",
+                    str(fallback_error)
+                )
 
-
-    except Exception as error:
-
-        print("Gemini API error:", str(error))
 
         raise HTTPException(
-            status_code=500,
-            detail=f"Gemini API error: {str(error)}"
+            status_code=503,
+            detail=(
+                "Gemini is temporarily unavailable. "
+                "Please try again shortly."
+            )
         )
+
+
+# ============================================================
+# END
+# ============================================================

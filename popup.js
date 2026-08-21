@@ -4,32 +4,57 @@
 
 
 // ========================================
+// CONFIGURATION
+// ========================================
+
+const API_URL =
+    "https://devwait-ai.onrender.com/ai";
+
+// TEMPORARY TEST KEY ONLY
+// DO NOT commit a real key to GitHub.
+const DEVWAIT_API_KEY =
+    "7fK9vQ2mX8rL4pN6sT1wZ3cH5jD0aB9eG2uY6";
+
+
+// ========================================
 // DOM ELEMENTS
 // ========================================
 
-const askBtn = document.getElementById("askBtn");
-const promptInput = document.getElementById("prompt");
-const responseBox = document.getElementById("response");
-const status = document.getElementById("status");
-const selectedTextBox = document.getElementById("selectedText");
+const askBtn =
+    document.getElementById("askBtn");
+
+const promptInput =
+    document.getElementById("prompt");
+
+const responseBox =
+    document.getElementById("response");
+
+const status =
+    document.getElementById("status");
+
+const selectedTextBox =
+    document.getElementById("selectedText");
 
 
-// Store the original AI response.
-// This is important for Copy Code.
+// ========================================
+// STORE ORIGINAL AI RESPONSE
+// ========================================
+
 let lastAIResponse = "";
 
 
 // ========================================
-// GET SELECTED TEXT FROM STORAGE
+// GET SELECTED TEXT
 // ========================================
 
 async function getSelectedText() {
 
     try {
 
-        const data = await chrome.storage.local.get([
-            "selectedText"
-        ]);
+        const data =
+            await chrome.storage.local.get([
+                "selectedText"
+            ]);
 
         console.log(
             "DevWait AI: getSelectedText:",
@@ -58,19 +83,22 @@ async function loadSelectedText() {
 
     try {
 
-        const data = await chrome.storage.local.get([
-            "selectedText",
-            "action"
-        ]);
+        const data =
+            await chrome.storage.local.get([
+                "selectedText",
+                "action"
+            ]);
 
         console.log(
             "DevWait AI: Loaded storage:",
             data
         );
 
+        const text =
+            data.selectedText || "";
 
-        const text = data.selectedText || "";
-        const action = data.action || "";
+        const action =
+            data.action || "";
 
 
         // ------------------------------------
@@ -152,7 +180,7 @@ async function loadSelectedText() {
 
 
 // ========================================
-// WATCH FOR STORAGE CHANGES
+// WATCH STORAGE CHANGES
 // ========================================
 
 chrome.storage.onChanged.addListener(
@@ -162,16 +190,13 @@ chrome.storage.onChanged.addListener(
             return;
         }
 
-
         if (changes.selectedText) {
 
             const newText =
                 changes.selectedText.newValue || "";
 
-
             selectedTextBox.textContent =
                 newText || "No text selected.";
-
 
             if (newText) {
 
@@ -193,13 +218,12 @@ function formatAIResponse(text) {
         return "";
     }
 
-
-    // Escape HTML characters first
-    const escaped = text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-
+    // Escape HTML
+    const escaped =
+        text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
 
     // Convert Markdown code blocks
     return escaped
@@ -209,7 +233,6 @@ function formatAIResponse(text) {
 
                 const lang =
                     language || "code";
-
 
                 return `
                     <div class="code-block">
@@ -263,15 +286,33 @@ askBtn.addEventListener(
 
 
         // ------------------------------------
+        // CHECK TEST KEY
+        // ------------------------------------
+
+        if (
+            !DEVWAIT_API_KEY ||
+                DEVWAIT_API_KEY === "YOUR_DEVWAIT_API_KEY"
+
+        ) {
+
+            status.textContent =
+                "DevWait API key is not configured ❌";
+
+            responseBox.textContent =
+                "Please configure your DevWait API key.";
+
+            return;
+        }
+
+
+        // ------------------------------------
         // LOADING
         // ------------------------------------
 
         status.textContent =
             "🤖 Gemini is thinking...";
 
-
         responseBox.innerHTML = "";
-
 
         askBtn.disabled = true;
 
@@ -279,42 +320,81 @@ askBtn.addEventListener(
         try {
 
             // --------------------------------
-            // CALL BACKEND
+            // CALL RENDER BACKEND
             // --------------------------------
 
-            const response = await fetch(
-                "http://127.0.0.1:8000/ai",
-                {
-                    method: "POST",
+            const response =
+                await fetch(
+                    API_URL,
+                    {
+                        method: "POST",
 
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+                        headers: {
 
-                    body: JSON.stringify({
-                        prompt: prompt
-                    })
-                }
-            );
+                            "Content-Type":
+                                "application/json",
+
+                            "X-DevWait-Key":
+                                DEVWAIT_API_KEY
+                        },
+
+                        body: JSON.stringify({
+                            prompt: prompt
+                        })
+                    }
+                );
 
 
             // --------------------------------
             // READ RESPONSE
             // --------------------------------
 
-            const data =
-                await response.json();
+            let data = {};
+
+            try {
+
+                data =
+                    await response.json();
+
+            } catch (jsonError) {
+
+                data = {};
+            }
 
 
             // --------------------------------
-            // ERROR RESPONSE
+            // AUTH ERROR
+            // --------------------------------
+
+            if (response.status === 401) {
+
+                throw new Error(
+                    "Invalid or missing DevWait API key."
+                );
+            }
+
+
+            // --------------------------------
+            // GEMINI TEMPORARY ERROR
+            // --------------------------------
+
+            if (response.status === 503) {
+
+                throw new Error(
+                    "Gemini is temporarily unavailable. Please try again shortly."
+                );
+            }
+
+
+            // --------------------------------
+            // OTHER API ERROR
             // --------------------------------
 
             if (!response.ok) {
 
                 throw new Error(
                     data.detail ||
-                    "API request failed"
+                    `API request failed (${response.status})`
                 );
             }
 
@@ -328,7 +408,19 @@ askBtn.addEventListener(
 
 
             // --------------------------------
-            // DISPLAY FORMATTED RESPONSE
+            // EMPTY AI RESPONSE
+            // --------------------------------
+
+            if (!lastAIResponse) {
+
+                throw new Error(
+                    "AI returned an empty response."
+                );
+            }
+
+
+            // --------------------------------
+            // DISPLAY RESPONSE
             // --------------------------------
 
             responseBox.innerHTML =
@@ -342,21 +434,24 @@ askBtn.addEventListener(
 
         } catch (error) {
 
-    console.error(
-        "DevWait AI:",
-        error
-    );
+            console.error(
+                "DevWait AI:",
+                error
+            );
 
-    status.textContent =
-        "Backend connection failed ❌";
 
-    responseBox.textContent =
-        "🔴 DevWait AI backend is not running.\n\n" +
-        "Please start your FastAPI server and try again.";
+            status.textContent =
+                "Request failed ❌";
 
-} finally {
 
-            askBtn.disabled = false;
+            responseBox.textContent =
+                "🔴 " +
+                error.message;
+
+        } finally {
+
+            askBtn.disabled =
+                false;
         }
     }
 );
@@ -501,7 +596,6 @@ document
                     error
                 );
 
-
                 status.textContent =
                     "Copy failed ❌";
             }
@@ -523,10 +617,6 @@ if (copyCodeBtn) {
         "click",
         async () => {
 
-            // ------------------------------
-            // Make sure AI responded
-            // ------------------------------
-
             if (!lastAIResponse) {
 
                 status.textContent =
@@ -536,18 +626,16 @@ if (copyCodeBtn) {
             }
 
 
-            // ------------------------------
-            // Find Markdown code blocks
-            // ------------------------------
-
             const codeBlocks =
                 lastAIResponse.match(
                     /```(?:\w+)?\s*([\s\S]*?)```/g
                 );
 
 
-            if (!codeBlocks ||
-                codeBlocks.length === 0) {
+            if (
+                !codeBlocks ||
+                codeBlocks.length === 0
+            ) {
 
                 status.textContent =
                     "No code block found.";
@@ -555,10 +643,6 @@ if (copyCodeBtn) {
                 return;
             }
 
-
-            // ------------------------------
-            // Extract code
-            // ------------------------------
 
             const code =
                 codeBlocks
@@ -577,10 +661,6 @@ if (copyCodeBtn) {
                     .join("\n\n");
 
 
-            // ------------------------------
-            // Copy
-            // ------------------------------
-
             try {
 
                 await navigator.clipboard.writeText(
@@ -597,7 +677,6 @@ if (copyCodeBtn) {
                     "Copy code error:",
                     error
                 );
-
 
                 status.textContent =
                     "Copy failed ❌";
@@ -659,7 +738,6 @@ responseBox.addEventListener(
                 "Copy code block error:",
                 error
             );
-
 
             status.textContent =
                 "Copy failed ❌";

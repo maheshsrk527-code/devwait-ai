@@ -1,25 +1,31 @@
 {
   "manifest_version": 3,
+
   "name": "DevWait AI",
+
   "version": "1.0.0",
-  "description": "AI-powered developer assistant.",
+
+  "description": "AI-powered developer assistant for explaining, fixing and debugging code.",
+
   "permissions": [
     "activeTab",
     "scripting",
     "storage",
     "contextMenus"
+  ],
 
-  ],
   "host_permissions": [
-    "http://127.0.0.1:8000/*",
-    "http://localhost:8000/*"
+    "https://devwait-ai.onrender.com/*"
   ],
+
   "action": {
     "default_popup": "popup.html"
   },
+
   "background": {
     "service_worker": "background.js"
   },
+
   "content_scripts": [
     {
       "matches": [
