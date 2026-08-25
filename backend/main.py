@@ -4,7 +4,10 @@ import random
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
@@ -65,11 +68,17 @@ client = genai.Client(
 # FASTAPI
 # ============================================================
 
+limiter = Limiter(
+    key_func=get_remote_address
+)
+
 app = FastAPI(
     title="DevWait AI",
-    version="0.5.0",
+    version="0.6.0",
     description="AI-powered developer assistant."
 )
+
+app.state.limiter = limiter
 
 
 # ============================================================

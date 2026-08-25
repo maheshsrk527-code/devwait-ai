@@ -8,12 +8,12 @@
 // ========================================
 
 const API_URL =
- "https://devwait-ai.onrender.com/ai"; 
+  "https://your-render-url.onrender.com/ai"; 
 
 // TEMPORARY TEST KEY ONLY
 // DO NOT commit a real key to GitHub.
 const DEVWAIT_API_KEY =
-    "N8xQ2mR7pL4vY9cA3fG6hJ1kT5sU0w"; // Replace with your actual DevWait API key
+    "7fK9vQ2mX8rL4pN6sT1wZ3cH5jD0aB9eG2uY6iO8"; // Replace with your actual DevWait API key
 
 
 // ========================================
