@@ -78,7 +78,7 @@ app = FastAPI(
     description="AI-powered developer assistant."
 )
 
-app.state.limiter = limiter
+app.state.limiter = limiter 
 
 
 # ============================================================
