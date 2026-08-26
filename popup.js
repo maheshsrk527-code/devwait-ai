@@ -8,7 +8,8 @@
 // ========================================
 
 const API_URL =
-  "https://your-render-url.onrender.com/ai"; 
+  "https://devwait-ai.onrender.com/ai"; 
+; 
 
 // TEMPORARY TEST KEY ONLY
 // DO NOT commit a real key to GitHub.
