@@ -1,15 +1,15 @@
 import os
 import time
 import random
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Header, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from google import genai
 
 
@@ -78,7 +78,7 @@ app = FastAPI(
     description="AI-powered developer assistant."
 )
 
-app.state.limiter = limiter 
+app.state.limiter = limiter
 
 
 # ============================================================
@@ -99,7 +99,11 @@ app.add_middleware(
 # ============================================================
 
 class AIRequest(BaseModel):
-    prompt: str
+    prompt: str = Field(
+        ...,
+        min_length=1,
+        max_length=20000
+    )
 
 
 # ============================================================
@@ -190,8 +194,10 @@ def generate_with_retry(model: str, prompt: str):
 # ============================================================
 
 @app.post("/ai")
+@limiter.limit("20/minute")
 def generate_ai(
-    request: AIRequest,
+    request: Request,
+    body: AIRequest,
     x_devwait_key: str | None = Header(
         default=None,
         alias="X-DevWait-Key"
@@ -209,7 +215,10 @@ def generate_ai(
             detail="Missing DevWait API key."
         )
 
-    if x_devwait_key != DEVWAIT_API_KEY:
+    if not secrets.compare_digest(
+        x_devwait_key,
+        DEVWAIT_API_KEY
+    ):
 
         raise HTTPException(
             status_code=401,
@@ -221,7 +230,7 @@ def generate_ai(
     # VALIDATE PROMPT
     # --------------------------------------------------------
 
-    prompt = request.prompt.strip()
+    prompt = body.prompt.strip()
 
     if not prompt:
 
@@ -304,8 +313,3 @@ def generate_ai(
                 "Please try again shortly."
             )
         )
-
-
-# ============================================================
-# END
-# ============================================================
