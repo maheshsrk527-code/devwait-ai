@@ -13,8 +13,34 @@ const API_URL =
 
 // TEMPORARY TEST KEY ONLY
 // DO NOT commit a real key to GitHub.
-const DEVWAIT_API_KEY =
-    "7fK9vQ2mX8rL4pN6sT1wZ3cH5jD0aB9eG2uY6iO8"; // Replace with your actual DevWait API key
+    const DEVWAIT_KEY_STORAGE = "devwaitApiKey";
+
+async function getDevWaitApiKey() {
+    const data = await chrome.storage.local.get([DEVWAIT_KEY_STORAGE]);
+
+    let key = (data[DEVWAIT_KEY_STORAGE] || "").trim();
+
+    if (key) {
+        return key;
+    }
+
+    key = window.prompt("Enter your DevWait API key:");
+
+    if (!key) {
+        return "";
+    }
+
+    key = key.trim();
+
+    if (key) {
+        await chrome.storage.local.set({
+            [DEVWAIT_KEY_STORAGE]: key
+        });
+    }
+
+    return key;
+}
+     // Replace with your actual DevWait API key
 
 
 // ========================================
@@ -283,30 +309,8 @@ askBtn.addEventListener(
                 "Please enter a question.";
 
             return;
-        }
-
-
-        // ------------------------------------
-        // CHECK TEST KEY
-        // ------------------------------------
-
-        if (
-            !DEVWAIT_API_KEY ||
-                DEVWAIT_API_KEY === "YOUR_DEVWAIT_API_KEY"
-
-        ) {
-
-            status.textContent =
-                "DevWait API key is not configured ❌";
-
-            responseBox.textContent =
-                "Please configure your DevWait API key.";
-
-            return;
-        }
-
-
-        // ------------------------------------
+        }  
+        
         // LOADING
         // ------------------------------------
 
@@ -335,10 +339,8 @@ askBtn.addEventListener(
                             "Content-Type":
                                 "application/json",
 
-                            "X-DevWait-Key":
-                                DEVWAIT_API_KEY
-                        },
-
+                            "X-DevWait-Key": await getDevWaitApiKey()
+                                                        },
                         body: JSON.stringify({
                             prompt: prompt
                         })
