@@ -14,8 +14,7 @@
     "contextMenus"
   ],
 "host_permissions": [
-  "https://devwait-ai.onrender.com/*",
-  "https://dlgcistpcixrffeigruy.supabase.co/*"
+  "https://devwait-ai.onrender.com/*"
 ],
   
   

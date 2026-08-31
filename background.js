@@ -1,10 +1,7 @@
 // DevWait AI - Background Service Worker
 
 function createContextMenus() {
-  const SUPABASE_URL = "https://dlgcistpcixrffeigruy.supabase.co";
-  
-  const SUPABASE_ANON_KEY = "sb_publishable_880fFaIGRRg3TK0JDdcFUA_VzMO3Z6V";
-    chrome.contextMenus.removeAll(() => {
+   chrome.contextMenus.removeAll(() => {
 
         chrome.contextMenus.create({
             id: "devwait-explain",
