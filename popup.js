@@ -42,7 +42,74 @@ async function getDevWaitApiKey() {
 }
      // Replace with your actual DevWait API key
 
+// ========================================
+// DEVWAIT AI v1.1 - STRUCTURED PROMPTS
+// ========================================
 
+function buildExplainPrompt(code) {
+    return `You are an expert software developer.
+
+Analyze the following code and explain it clearly for a developer.
+
+Use this structure:
+
+1. Language
+2. Purpose
+3. How It Works
+4. Important Concepts
+5. Potential Issues
+6. Example or Improvement
+
+Keep the explanation practical and easy to understand.
+
+Code:
+
+${code}`;
+}
+
+
+function buildFixPrompt(code) {
+    return `You are an expert software developer.
+
+Analyze the following code and identify any syntax, logic, runtime, or implementation problems.
+
+Use this structure:
+
+1. Problem
+2. Root Cause
+3. Corrected Code
+4. What Changed
+5. Why the Fix Works
+
+If the code is already correct, clearly say that no fix is required.
+
+Code:
+
+${code}`;
+}
+
+
+function buildDebugPrompt(code) {
+    return `You are an expert software debugger.
+
+Debug the following code carefully.
+
+Use this structure:
+
+1. Observed Behavior
+2. Expected Behavior
+3. Root Cause
+4. Problematic Code
+5. Corrected Code
+6. Explanation
+7. Test Case
+
+Focus on identifying the actual cause rather than guessing.
+
+Code:
+
+${code}`;
+}
 // ========================================
 // DOM ELEMENTS
 // ========================================
@@ -154,8 +221,7 @@ async function loadSelectedText() {
 
         if (action === "explain") {
 
-            promptInput.value =
-                `Explain this code clearly for a developer:\n\n${text}`;
+            promptInput.value = buildExplainPrompt(text);
         }
 
 
@@ -165,9 +231,7 @@ async function loadSelectedText() {
 
         else if (action === "fix") {
 
-            promptInput.value =
-                `Find the errors and provide corrected code:\n\n${text}`;
-        }
+promptInput.value = buildFixPrompt(text);        }
 
 
         // ------------------------------------
@@ -176,8 +240,7 @@ async function loadSelectedText() {
 
         else if (action === "debug") {
 
-            promptInput.value =
-                `Debug this code. Explain the root cause and provide a solution:\n\n${text}`;
+          promptInput.value = buildDebugPrompt(text);
         }
 
 
@@ -307,13 +370,9 @@ askBtn.addEventListener(
 
             status.textContent =
                 "Please enter a question.";
-
             return;
         }  
-        
         // LOADING
-        // ------------------------------------
-
         status.textContent =
             "🤖 Gemini is thinking...";
 
