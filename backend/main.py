@@ -116,7 +116,7 @@ def root():
     return {
         "status": "online",
         "service": "DevWait AI",
-        "version": "0.5.0"
+        "version": "0.6.0"
     }
 
 
